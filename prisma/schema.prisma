@@ -1,0 +1,123 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String      @id @default(cuid())
+  name              String
+  email             String      @unique
+  password          String
+  image             String?
+  emailVerified     DateTime?   // NextAuth.js uses this to store verification time
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  plan              String      @default("FREE")  // FREE, BASIC, STANDARD, PREMIUM
+  stripeCustomerId  String?
+  uploadsThisWeek   Int         @default(0)
+  lastUploadReset   DateTime    @default(now())
+  verificationToken String?     @unique
+  resetToken        String?     // For password reset
+  resetTokenExpiry  DateTime?   // Reset token expiry
+  onboardingStatus  String      @default("NOT_STARTED")  // NOT_STARTED, SKIPPED, COMPLETED
+  freeScanCount     Int         @default(1)  // Starts with 1, can get +2 after onboarding
+  tasteProfile      TasteProfile?
+  menuUploads       MenuUpload[]
+  restaurantVisits  RestaurantVisit[]
+  ratings           Rating[]
+  accounts          Account[]
+  sessions          Session[]
+}
+
+model TasteProfile {
+  id                  String   @id @default(cuid())
+  userId              String   @unique
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  favoriteDishes      String   // JSON array
+  dislikedIngredients String   // JSON array
+  dietaryRestrictions String   // JSON object
+  spicePreference    String   // enum: none, mild, medium, hot, very-hot
+  tastePreferences   String   // JSON object of taste preferences
+  cuisinePreferences  String   // JSON array
+  allergies          String   // JSON array
+  additionalNotes    String   @default("")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model MenuUpload {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  imageUrl        String?  // Made optional with ?
+  parsedText      String   // JSON array of extracted dishes
+  recommendations String   // JSON array of recommendations
+  restaurantName  String?
+  mood            String?  // User's mood if onboarding was skipped
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  ratings         Rating[]
+  restaurantVisits RestaurantVisit[]
+}
+
+model Rating {
+  id        String     @id @default(cuid())
+  userId    String
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  uploadId  String
+  upload    MenuUpload @relation(fields: [uploadId], references: [id], onDelete: Cascade)
+  dishName  String
+  rating    Int
+  comment   String?
+  createdAt DateTime   @default(now())
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model RestaurantVisit {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  restaurantName String
+  visitDate     DateTime  @default(now())
+  menuUploadId  String?
+  menuUpload    MenuUpload? @relation(fields: [menuUploadId], references: [id])
+  orderedDish   String
+  rating        Int?      // 1-5 stars
+  notes         String?
+  mood          String?   // What user was in the mood for
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+} 
